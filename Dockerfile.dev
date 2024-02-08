@@ -1,15 +1,23 @@
-FROM tiangolo/uvicorn-gunicorn-fastapi:python3.8
+# Builder stage
+FROM node:14.15.5-alpine3.10 AS builder
 
-COPY ./requirements.txt /app
+WORKDIR /usr/app
 
-RUN pip install cmake
+COPY package.json .
 
-RUN pip install -r requirements.txt
+COPY yarn.lock .
 
-ENV SERVER_BASE_URL="http://localhost:8000/"
+RUN yarn install
 
-RUN apt-get update
-RUN apt-get install -y libgl1-mesa-dev
+COPY . .
 
-COPY ./Database/. /app/Database
-COPY ./output/. /app/output
+RUN yarn build
+
+# Serve production build using nginx
+FROM nginx:1.19.8-alpine
+
+COPY --from=builder /usr/app/build /usr/share/nginx/html
+
+COPY --from=builder /usr/app/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
